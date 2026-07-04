@@ -169,6 +169,11 @@
   .win p{color:var(--muted);margin:0 0 24px}
   .winstats{display:flex;justify-content:center;gap:14px;margin-bottom:26px}
   .winstats .metric{min-width:88px}
+  .newbest{
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--green);margin:-14px 0 22px;display:none;
+  }
+  .newbest.show{display:block}
 
   @media (max-width:860px){
     .play{grid-template-columns:1fr}
@@ -196,6 +201,7 @@
           <div class="metric headline"><span class="num" id="mScore">0</span><span class="lbl">Score / 100</span></div>
           <div class="metric"><span class="num" id="mRounds">0</span><span class="lbl">Rounds</span></div>
           <div class="metric"><span class="num" id="mAcc">—</span><span class="lbl">Accuracy</span></div>
+          <div class="metric"><span class="num" id="mBest">0</span><span class="lbl">Best score</span></div>
         </div>
         <div class="progress" aria-hidden="true"><div class="bar" id="bar"></div></div>
       </div>
@@ -242,7 +248,9 @@
         <div class="metric"><span class="num" id="wRounds">0</span><span class="lbl">Rounds</span></div>
         <div class="metric"><span class="num" id="wCorrect">0</span><span class="lbl">Correct</span></div>
         <div class="metric"><span class="num" id="wAcc">0%</span><span class="lbl">Accuracy</span></div>
+        <div class="metric"><span class="num" id="wBest">0</span><span class="lbl">Best rounds</span></div>
       </div>
+      <p class="newbest" id="newBest">New record — fewest rounds yet</p>
       <button class="pbtn" id="replayBtn" style="padding:13px 26px">Play again</button>
     </div>
   </div>
@@ -273,8 +281,10 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
   const mScore = document.getElementById('mScore');
   const mRounds = document.getElementById('mRounds');
   const mAcc = document.getElementById('mAcc');
+  const mBest = document.getElementById('mBest');
   const bar = document.getElementById('bar');
   const winEl = document.getElementById('win');
+  const newBestEl = document.getElementById('newBest');
 
   // ---------- data ----------
   const features = WORLD.features.filter(f => f.geometry);
@@ -309,6 +319,17 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
   const answered = new Set();  // names already resolved
   const wrong = new Set();     // names guessed incorrectly (stay red)
   let score = 0, rounds = 0, correct = 0, won = false;
+
+  // ---------- high score (persisted) ----------
+  const BEST_KEY = 'terraIncognita.best';
+  function loadBest(){
+    try{
+      const raw = JSON.parse(localStorage.getItem(BEST_KEY));
+      return { score: raw?.score||0, rounds: raw?.rounds||null };
+    }catch(e){ return { score:0, rounds:null }; }
+  }
+  function saveBest(){ try{ localStorage.setItem(BEST_KEY, JSON.stringify(best)); }catch(e){} }
+  const best = loadBest();
 
   // ---------- drawing ----------
   function fillStroke(feature, fill, stroke, lw){
@@ -492,6 +513,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
     mScore.textContent = score;
     mRounds.textContent = rounds;
     mAcc.textContent = rounds ? Math.round(correct/rounds*100)+'%' : '—';
+    mBest.textContent = best.score;
     bar.style.width = Math.max(0, Math.min(100, score)) + '%';
   }
 
@@ -517,6 +539,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
     answered.add(key);
     if(!ok) wrong.add(key);
     pushRecent(disp, ok, ok?5:-1);
+    if(score>best.score){ best.score=score; saveBest(); }
     updateScoreboard();
     // resolve target but keep the message visible
     target = null;
@@ -548,9 +571,14 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
   }
 
   function showWin(){
+    const isRecord = best.rounds===null || rounds<best.rounds;
+    if(isRecord){ best.rounds=rounds; saveBest(); }
     document.getElementById('wRounds').textContent=rounds;
     document.getElementById('wCorrect').textContent=correct;
     document.getElementById('wAcc').textContent=(rounds?Math.round(correct/rounds*100):0)+'%';
+    document.getElementById('wBest').textContent=best.rounds;
+    newBestEl.classList.toggle('show', isRecord);
+    updateScoreboard();
     winEl.classList.add('show');
   }
   function resetGame(){
