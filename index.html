@@ -424,7 +424,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
     // land
     for(const f of features){
       const nm = f.properties.name;
-      let fill = '#c9ad7a';                 // unanswered land
+      let fill = regionNoun(f)==='country' ? '#c9ad7a' : '#b090a8'; // unanswered: land vs. state/province
       if(wrong.has(nm)) fill = '#a8504a';   // guessed wrong → red
       else if(partial.has(nm)) fill = '#c9963f'; // capital wrong (hard mode) → amber
       else if(answered.has(nm)) fill = '#6f8f63'; // guessed right → green
