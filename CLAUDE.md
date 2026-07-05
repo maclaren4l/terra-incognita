@@ -34,10 +34,13 @@ Everything lives in `index.html`:
   score readout), the globe canvas, the "console" sidebar (target card,
   guess input, recent-guesses list), and the win overlay dialog.
 - **Line 298**: a single line holding `const WORLD = {...}` — a GeoJSON
-  `FeatureCollection` (Natural Earth 1:110m admin-0 countries, public
-  domain, simplified) with 177 country features. This line is very long
-  (~200K characters); don't try to eyeball-diff it, and don't hand-edit it
-  unless you're deliberately changing map data.
+  `FeatureCollection` with 226 features: 176 countries (Natural Earth
+  1:110m admin-0, public domain, simplified) plus the 50 U.S. states in
+  place of a single "United States of America" entry (states use the
+  same feature schema, sourced separately at comparable simplification).
+  This line is very long (~300K characters); don't try to eyeball-diff
+  it, and don't hand-edit it unless you're deliberately changing map data
+  — regenerate it with a script instead.
 - **Lines 300–805**: the game's JS, in one IIFE. This is the part you'll
   actually be editing for feature work.
 
@@ -58,7 +61,11 @@ Each `feature.properties` in `WORLD` has:
 
 `feature.properties.name` (not `long`) is the key used in the `answered` /
 `wrong` / `partial` sets and in `best`/localStorage bookkeeping — `long` is
-purely for display.
+purely for display. Because countries and U.S. states share one flat
+feature list keyed by this name, the state of Georgia is stored with
+`name: "Georgia (US)"` / `long: "Georgia"` to avoid colliding with the
+country of the same name; every other state has `name === long`. If you
+add more regions later, check for this kind of collision the same way.
 
 ## Game architecture
 
