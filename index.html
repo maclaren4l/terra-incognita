@@ -141,6 +141,8 @@
   }
   .card::before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--sheen);pointer-events:none;z-index:-1}
   .target .state{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .timer{margin-left:auto;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted);text-transform:none}
+  .timer.low{color:var(--red)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 0 rgba(255,106,77,.5)}
   .target.armed .dot{background:var(--coral);animation:ping 1.6s ease-out infinite}
   @keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,106,77,.55)}70%{box-shadow:0 0 0 9px rgba(255,106,77,0)}100%{box-shadow:0 0 0 0 rgba(255,106,77,0)}}
@@ -258,7 +260,7 @@
 
       <aside class="console">
         <div class="card target" id="targetCard">
-          <div class="state"><span class="dot"></span><span id="stateText">No country marked</span></div>
+          <div class="state"><span class="dot"></span><span id="stateText">No country marked</span><span class="timer" id="timerText"></span></div>
           <div class="prompt" id="prompt">Click a country to mark it.</div>
           <div class="region" id="region"></div>
           <div class="guess" style="margin-top:18px">
@@ -316,6 +318,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
   const stateText = document.getElementById('stateText');
   const regionEl = document.getElementById('region');
   const targetCard = document.getElementById('targetCard');
+  const timerText = document.getElementById('timerText');
   const recentEl = document.getElementById('recent');
   const mScore = document.getElementById('mScore');
   const mRounds = document.getElementById('mRounds');
@@ -362,6 +365,10 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
   let score = 0, rounds = 0, correct = 0, won = false;
   let hintShown = false;      // easy mode: hint already given for the current target
   let pendingCapital = false; // hard mode: country named correctly, now asking for its capital
+  let timerInterval = null, timerDeadline = 0; // per-round countdown (country-name guess only)
+
+  // ---------- countdown timer (seconds allowed to name the marked country) ----------
+  const DIFF_TIMERS = { easy: 30, medium: 20, hard: 10 };
 
   // ---------- difficulty ----------
   const DIFF_KEY = 'terraIncognita.difficulty';
@@ -535,6 +542,36 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
     return `starts with "${disp.charAt(0).toUpperCase()}"`;
   }
 
+  function clearTimer(){
+    if(timerInterval){ clearInterval(timerInterval); timerInterval=null; }
+    timerText.textContent=''; timerText.classList.remove('low');
+  }
+  function tickTimer(){
+    const remaining = Math.max(0, Math.ceil((timerDeadline-performance.now())/1000));
+    timerText.textContent = remaining+'s';
+    timerText.classList.toggle('low', remaining<=5);
+    if(remaining<=0){ clearTimer(); handleTimeout(); }
+  }
+  function startTimer(seconds){
+    clearTimer();
+    if(!seconds) return;
+    timerDeadline = performance.now()+seconds*1000;
+    tickTimer();
+    timerInterval = setInterval(tickTimer, 200);
+  }
+  function handleTimeout(){
+    if(!target || pendingCapital) return;
+    const feature = target;
+    const key = feature.properties.name;
+    const disp = feature.properties.long || key;
+    rounds++;
+    score -= 1;
+    feedbackEl.innerHTML = `Time's up — this is <b>${disp}</b>. <b>−1</b>`;
+    feedbackEl.className='feedback bad';
+    flash(feature, '#ff5470');
+    finalizeRound(feature, key, disp, false, -1);
+  }
+
   // ---------- target / round flow ----------
   function markTarget(feature){
     target = feature;
@@ -542,6 +579,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
     targetCard.classList.add('armed');
     stateText.textContent = 'Country marked';
     promptEl.textContent = 'What country is this?';
+    startTimer(DIFF_TIMERS[difficulty]);
     const p = feature.properties;
     if(difficulty==='easy'){
       const bits = [];
@@ -558,6 +596,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
     draw();
   }
   function clearTarget(){
+    clearTimer();
     target = null;
     hintShown = false; pendingCapital = false;
     targetCard.classList.remove('armed');
@@ -609,6 +648,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
 
     if(difficulty==='hard' && ok && feature.properties.capital){
       pendingCapital = true;
+      clearTimer();
       feedbackEl.innerHTML = `Correct — that's <b>${disp}</b>. Name its capital for full credit.`;
       feedbackEl.className = 'feedback good';
       stateText.textContent = 'Capital required';
@@ -656,6 +696,7 @@ const WORLD = {"type":"FeatureCollection","features":[{"type":"Feature","propert
   }
 
   function finalizeRound(feature, key, disp, ok, delta){
+    clearTimer();
     answered.add(key);
     if(!ok) wrong.add(key);
     pushRecent(disp, ok, delta);
