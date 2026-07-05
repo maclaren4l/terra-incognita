@@ -41,9 +41,33 @@ If this errors about JavaScript from Apple Events being disabled, enable
 it once via Safari's Develop menu ("Allow JavaScript from Apple Events") —
 Develop menu must be turned on first in Safari > Settings > Advanced.
 
-From here, `document 1` is the game tab for the rest of the session
-(unless you open other tabs first — check with
-`tell application "Safari" to name of every document`).
+From here, `document 1` is the game tab — **but don't assume that index
+stays put.** `document`/`tab` indices are ordered by Safari's own notion
+of front-to-back/recency, not creation order. If the user is using this
+Mac at the same time you're testing (very possible — this is their real
+desktop, not a disposable CI container), their own browsing (opening a
+YouTube tab, a Google search, clicking a link) reorders or displaces
+"document 1" out from under you. Symptoms: `do JavaScript ... in
+document 1` returns content from an unrelated site, or throws `Can't get
+document 2` after it worked moments earlier.
+
+Don't fight this by hardcoding an index. Before any `do JavaScript` call
+in a long test session, re-resolve the right document by content, e.g.:
+
+```bash
+osascript -e 'tell application "Safari" to name of every document'
+osascript -e 'tell application "Safari" to URL of every document'
+```
+
+and match on the one whose title is "Terra Incognita — Name the Country"
+or whose URL is the one you opened. If the tab isn't in `documents` at
+all (Safari's `document` list can reflect only the frontmost tab per
+window), check `tell application "Safari" to name of every tab of window
+1` and bring it forward with `set current tab of window 1 to tab N of
+window 1` before scripting it. When in doubt, it's cheaper to just open a
+**fresh, dedicated tab** for the test (`make new document`) than to
+guess which existing one is still yours — and close only that tab when
+you're done, leaving the user's other tabs/windows untouched.
 
 ## 3. Don't click by guessing screen pixels — dispatch events with known coordinates
 
