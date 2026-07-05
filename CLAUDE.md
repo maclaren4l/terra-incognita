@@ -18,9 +18,11 @@ There is no build/lint/test tooling — it's one HTML file.
   ```bash
   python3 -m http.server 8000   # then visit http://localhost:8000
   ```
-- Deploy: pushing to `beta` (the default branch) triggers
-  `.github/workflows/static.yml`, which uploads the repo root as-is to
-  GitHub Pages. No other CI exists.
+- Deploy: GitHub Pages auto-builds and deploys from `beta` (the default
+  branch, "legacy"/branch-based Pages source) on every push — no workflow
+  file drives it. An earlier `.github/workflows/static.yml` Actions-based
+  deploy was removed because it fired on the same push and raced the
+  automatic branch deploy, occasionally making one or both fail.
 - There is no automated test suite. Verify changes by loading the page and
   playing a round (see "How to play" in README.md).
 
